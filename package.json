@@ -1,0 +1,26 @@
+{
+  "name": "@cinatra-ai/email-recipient-selection-agent",
+  "version": "0.1.1",
+  "license": "Apache-2.0",
+  "description": "Resolves a contacts list (list-only scope) into the campaign recipient pool, with maxRecipients cap enforcement and email_send_events cooldown filter.",
+  "type": "module",
+  "cinatra": {
+    "apiVersion": "cinatra.ai/v1",
+    "kind": "agent",
+    "dependencies": [
+      {
+        "packageName": "@cinatra-ai/reviewer-agent",
+        "edgeType": "runtime",
+        "versionConstraint": {
+          "kind": "semver-range",
+          "range": "*"
+        },
+        "requirement": "required",
+        "kind": "agent"
+      }
+    ],
+    "agentDependencies": {
+      "@cinatra-ai/reviewer-agent": "^0.1.0"
+    }
+  }
+}
