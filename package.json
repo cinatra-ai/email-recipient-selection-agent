@@ -25,6 +25,24 @@
     ],
     "agentDependencies": {
       "@cinatra-ai/reviewer-agent": "^0.1.0"
-    }
+    },
+    "fieldRenderers": [
+      {
+        "id": "@cinatra-ai/email-recipient-selection-agent:output",
+        "kind": "campaign-recipients-review",
+        "priority": 80,
+        "a2uiTranslator": "recipients-output"
+      },
+      {
+        "id": "@cinatra-ai/email-recipient-selection-agent:campaign-recipients-review",
+        "kind": "campaign-recipients-review",
+        "priority": 80
+      },
+      {
+        "id": "@cinatra-ai/email-outreach-agent:list-picker",
+        "kind": "list-picker",
+        "priority": 90
+      }
+    ]
   }
 }
