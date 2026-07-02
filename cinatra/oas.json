@@ -11,8 +11,7 @@
         "@cinatra-ai/email-outreach-agent:list-picker",
         "@cinatra-ai/reviewer-agent:output"
       ],
-      "packageName": "@cinatra-ai/email-recipient-selection-agent",
-      "packageVersion": "0.1.0"
+      "packageName": "@cinatra-ai/email-recipient-selection-agent"
     }
   },
   "inputs": [
