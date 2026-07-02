@@ -43,6 +43,7 @@
         "kind": "list-picker",
         "priority": 90
       }
-    ]
+    ],
+    "consumes": []
   }
 }
