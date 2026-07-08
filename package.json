@@ -11,6 +11,7 @@
   "cinatra": {
     "apiVersion": "cinatra.ai/v1",
     "kind": "agent",
+    "displayName": "Email Recipient Selection Agent",
     "dependencies": [
       {
         "packageName": "@cinatra-ai/reviewer-agent",
@@ -44,6 +45,15 @@
         "priority": 90
       }
     ],
-    "consumes": []
+    "consumes": [],
+    "packageType": "agent",
+    "manifestVersion": 1,
+    "sourceTemplateId": "email-recipient-selection-flow",
+    "sourceVersionId": "9ddb1cf0-16de-4213-8a3d-2130b99ddec8",
+    "sourceVersionNumber": 1,
+    "riskLevel": "low",
+    "hasApprovalGates": true,
+    "toolAccess": [],
+    "ownerOrgId": null
   }
 }
