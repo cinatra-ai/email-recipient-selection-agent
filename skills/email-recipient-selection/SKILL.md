@@ -164,6 +164,10 @@ Return EXACTLY:
 
 The orchestrator wires `confirmedRecipientsRef` into the next subflow via DataFlowEdge.
 
+## Review gate (re-entrant) — persistence is post-resume
+
+The bundle you persist in STEP 5 is the run's **pre-gate snapshot**. The downstream `campaign-recipients-review` approval gate surfaces that snapshot to the operator (the interrupt payload carries the authorized `confirmedRecipients`), the operator removes/restores recipients in the pack-served renderer, and a post-resume `apply` node persists the **reviewed** recipient set onto this same `@cinatra-ai/campaigns:recipients` object via the run-scoped `email_outreach_recipients_update` primitive. The flow's terminal `confirmedRecipients` / `recipientCount` outputs are sourced from that `apply` node — i.e. the **reviewed** set, never the pre-gate generated set. You do nothing extra here; just produce the STEP 5 bundle. Call `objects_save` once only.
+
 ## What I retrieve myself (MCP)
 
 - `crm_list_get` — fetches list metadata (name, objectType) for bundle provenance.
