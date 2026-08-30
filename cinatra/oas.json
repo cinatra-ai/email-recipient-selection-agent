@@ -283,9 +283,7 @@
       "name": "Inputs",
       "metadata": {
         "cinatra": {
-          "required": [
-            "campaignId"
-          ],
+          "required": [],
           "hidden": [
             "campaignId",
             "agent_run_id",
