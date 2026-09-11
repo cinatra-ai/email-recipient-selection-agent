@@ -345,7 +345,27 @@
           "type": "array",
           "json_schema": {
             "items": {
-              "type": "object"
+              "type": "object",
+              "properties": {
+                "contactId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": "string"
+                },
+                "accountId": {
+                  "type": "string"
+                },
+                "accountName": {
+                  "type": "string"
+                }
+              }
             }
           }
         }
