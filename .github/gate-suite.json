@@ -66,7 +66,14 @@
     "**/trust-gate/**",
     "**/signature-gate/**",
     "**/capability-registry/**",
-    "**/transport-registry/**"
+    "**/transport-registry/**",
+    "docs-site/astro.config.mjs",
+    "docs-site/src/content.config.ts",
+    "docs-site/integrations-registry.json",
+    "**/integrations-registry.json",
+    "scripts/sync-docs.mjs",
+    "scripts/docs-contract-gate.mjs",
+    "scripts/lib/docs-contract-rules.mjs"
   ],
   "lastAuditedAt": "2026-09-15",
   "auditEvidence": "2026-09-15 birth of this suite on its own pull request (engineering#675, under engineering#669): every context listed here is a context this repository's main ruleset requires - or the truthful-attribution-gate read by name - each gate pin equals the sha this repository's own caller workflow pins at this head, highRiskPaths carries every central cinatra-ai/ci high-risk default read at the engine sha this repository's attribution caller pins, and every listed context read green on the head of that pull request; the first merge, a high-risk .github/** change, carries a maintainer review rather than this suite's own gate arm."
