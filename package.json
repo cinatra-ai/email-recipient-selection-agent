@@ -1,6 +1,6 @@
 {
   "name": "@cinatra-ai/email-recipient-selection-agent",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "license": "Apache-2.0",
   "files": [
     "cinatra"
@@ -27,7 +27,8 @@
         "kind": "list-picker",
         "priority": 90,
         "params": {
-          "listBuilderPackage": "@cinatra-ai/list-curator-agent"
+          "selection": "multiple",
+          "minSelected": 1
         }
       }
     ],
