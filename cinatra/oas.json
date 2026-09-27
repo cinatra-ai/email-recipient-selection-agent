@@ -80,6 +80,9 @@
       "$component_ref": "apply"
     },
     {
+      "$component_ref": "selection_summary"
+    },
+    {
       "$component_ref": "end"
     }
   ],
@@ -126,9 +129,19 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "apply_to_end",
+      "name": "apply_to_selection_summary",
       "from_node": {
         "$component_ref": "apply"
+      },
+      "to_node": {
+        "$component_ref": "selection_summary"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "selection_summary_to_end",
+      "from_node": {
+        "$component_ref": "selection_summary"
       },
       "to_node": {
         "$component_ref": "end"
@@ -255,6 +268,30 @@
         "$component_ref": "apply"
       },
       "destination_input": "agent_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "apply_to_selection_summary_recipientCount",
+      "source_node": {
+        "$component_ref": "apply"
+      },
+      "source_output": "reviewedCount",
+      "destination_node": {
+        "$component_ref": "selection_summary"
+      },
+      "destination_input": "recipientCount"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "generate_to_selection_summary_proposedCount",
+      "source_node": {
+        "$component_ref": "generate"
+      },
+      "source_output": "recipientCount",
+      "destination_node": {
+        "$component_ref": "selection_summary"
+      },
+      "destination_input": "proposedCount"
     }
   ],
   "$referenced_components": {
@@ -374,6 +411,29 @@
         "cinatra": {
           "riskClass": "read_only",
           "requiresApproval": false
+        }
+      }
+    },
+    "selection_summary": {
+      "component_type": "OutputMessageNode",
+      "id": "selection_summary",
+      "name": "Recipient selection result",
+      "inputs": [
+        {
+          "title": "recipientCount",
+          "type": "integer",
+          "default": 0
+        },
+        {
+          "title": "proposedCount",
+          "type": "integer",
+          "default": 0
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ recipientCount }} {{ proposedCount }} #}{% if not recipientCount and not proposedCount %}No recipients were selected: the list you picked could not be read, was larger than the recipient limit, or held no contact with a name and a company, so nothing was added to the campaign.{% elif not recipientCount %}No recipients were confirmed: all {{ proposedCount }} proposed recipients were removed in the review.{% else %}{{ recipientCount }} recipients were confirmed for the campaign.{% endif %}",
+      "metadata": {
+        "cinatra": {
+          "purpose": "plain-language-recipient-selection-ending"
         }
       }
     },
