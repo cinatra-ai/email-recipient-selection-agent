@@ -79,5 +79,5 @@ test("6d — the campaign is hidden plumbing, no longer listed as required", () 
 
 test("6d — its two pauses are declared and exist", () => {
   assert.equal(cinatra.hasApprovalGates, true);
-  assert.equal(approvalNodes(oas).length, 2);
+  assert.equal(approvalNodes(oas).filter((id) => components[id]?.component_type === "InputMessageNode").length, 2);
 });

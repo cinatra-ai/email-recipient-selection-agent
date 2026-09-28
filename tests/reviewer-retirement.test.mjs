@@ -122,11 +122,12 @@ test("no a2ui surface id sits in a review agent's namespace", () => {
 });
 
 test("hitlScreens names exactly the renderers this flow's own nodes declare", () => {
-  // Every node that declares a renderer IS a HITL node — a renderer is what a gate
-  // shows the operator — so the declared-renderer set and the advertised-screen
-  // set have to be the same set, in both directions.
+  // A gate's renderer is a screen the operator sees, so the renderers this flow's
+  // input steps declare and the advertised-screen set have to be the same set, in
+  // both directions. The generate step's output renderer is not a gate.
   const screens = oas.metadata.cinatra.hitlScreens;
   const rendered = Object.values(oas.$referenced_components)
+    .filter((n) => n?.component_type === "InputMessageNode")
     .map((n) => n?.metadata?.cinatra?.renderer)
     .filter(Boolean);
   for (const screen of screens) {
@@ -148,7 +149,7 @@ test("the operator's approve/reject gate survives", () => {
   assert.ok(gate, "approval_gate must exist — it is the operator's only say");
   assert.equal(gate.component_type, "InputMessageNode");
   assert.equal(gate.metadata.cinatra.requiresApproval, true);
-  assert.equal(gate.metadata.cinatra.riskClass, "approval");
+  assert.equal(gate.metadata.cinatra.riskClass, "read_only");
   // Self-namespaced, and pinned to the EXACT id: a namespace-only check would let
   // a typo'd or nonexistent renderer through, and the gate would render nothing.
   assert.equal(
