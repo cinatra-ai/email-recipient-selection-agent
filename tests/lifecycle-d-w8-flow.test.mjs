@@ -106,7 +106,7 @@ test("(19) the run ends in plain language, never in the envelope", () => {
   assert.ok(!hasEdge("apply", "end"), "the run still jumps straight to its end");
   assert.deepEqual(
     refs.end.outputs.map((o) => o.title),
-    ["campaignId", "recipientCount", "confirmedRecipients", "userResponse"],
+    ["campaignId", "recipientCount", "confirmedRecipients", "userResponse", "confirmedRecipientsRef"],
     "the end node no longer carries the values the run hands on",
   );
 });
