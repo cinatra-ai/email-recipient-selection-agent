@@ -6,10 +6,11 @@
 // flags, params — params key order included) and REFUSES two declarers whose
 // strings differ, so this entry must carry the identical params object the
 // outreach package declares: the account scope's selection contract, several
-// lists selectable and at least one ticked. That string is owned by the
-// outreach package's own version 0.1.5 manifest, and the retired list-builder
-// parameter is no longer part of it. kind, priority and the flag set stay
-// exactly as they were.
+// lists selectable and at least one ticked, the question the step asks and the
+// message a person reads when there is nothing to pick. That string is owned by
+// the outreach package's own version 0.1.6 manifest, and the retired
+// list-builder parameter is no longer part of it. kind, priority and the flag
+// set stay exactly as they were.
 
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -31,11 +32,20 @@ test("it names the selection contract in params, as the outreach package does", 
   assert.deepEqual(entry.params, {
     selection: "multiple",
     minSelected: 1,
+    question: "Which views or lists in your CRM should this run take its recipients from?",
+    emptyState:
+      "There are no views or lists to pick from yet. Create one in your CRM, then open this step again.",
   });
 });
 
 test("params, the comparable string and the retired key follow the outreach package", () => {
-  assert.deepEqual(entry.params, { selection: "multiple", minSelected: 1 });
+  assert.deepEqual(entry.params, {
+    selection: "multiple",
+    minSelected: 1,
+    question: "Which views or lists in your CRM should this run take its recipients from?",
+    emptyState:
+      "There are no views or lists to pick from yet. Create one in your CRM, then open this step again.",
+  });
   assert.equal(
     JSON.stringify({
       kind: entry.kind,
@@ -45,7 +55,7 @@ test("params, the comparable string and the retired key follow the outreach pack
       params: entry.params ?? null,
       component: entry.component ?? null,
     }),
-    '{"kind":"list-picker","priority":90,"midRunHitl":false,"a2uiTranslator":null,"params":{"selection":"multiple","minSelected":1},"component":null}',
+    '{"kind":"list-picker","priority":90,"midRunHitl":false,"a2uiTranslator":null,"params":{"selection":"multiple","minSelected":1,"question":"Which views or lists in your CRM should this run take its recipients from?","emptyState":"There are no views or lists to pick from yet. Create one in your CRM, then open this step again."},"component":null}',
   );
   assert.equal(Object.hasOwn(entry.params, "listBuilderPackage"), false);
 });
