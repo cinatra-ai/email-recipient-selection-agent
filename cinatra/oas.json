@@ -75,7 +75,16 @@
       "$component_ref": "start"
     },
     {
+      "$component_ref": "fetch_lists"
+    },
+    {
+      "$component_ref": "emit_lists"
+    },
+    {
       "$component_ref": "scope_gate"
+    },
+    {
+      "$component_ref": "scope_branch"
     },
     {
       "$component_ref": "generate"
@@ -96,9 +105,29 @@
   "control_flow_connections": [
     {
       "component_type": "ControlFlowEdge",
-      "name": "start_to_scope_gate",
+      "name": "start_to_fetch_lists",
       "from_node": {
         "$component_ref": "start"
+      },
+      "to_node": {
+        "$component_ref": "fetch_lists"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "fetch_lists_to_emit_lists",
+      "from_node": {
+        "$component_ref": "fetch_lists"
+      },
+      "to_node": {
+        "$component_ref": "emit_lists"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "emit_lists_to_scope_gate",
+      "from_node": {
+        "$component_ref": "emit_lists"
       },
       "to_node": {
         "$component_ref": "scope_gate"
@@ -106,12 +135,34 @@
     },
     {
       "component_type": "ControlFlowEdge",
-      "name": "scope_gate_to_generate",
+      "name": "scope_gate_to_scope_branch",
       "from_node": {
         "$component_ref": "scope_gate"
       },
       "to_node": {
+        "$component_ref": "scope_branch"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "scope_branch_default_to_generate",
+      "from_node": {
+        "$component_ref": "scope_branch"
+      },
+      "from_branch": "default",
+      "to_node": {
         "$component_ref": "generate"
+      }
+    },
+    {
+      "component_type": "ControlFlowEdge",
+      "name": "scope_branch_refresh_to_fetch_lists",
+      "from_node": {
+        "$component_ref": "scope_branch"
+      },
+      "from_branch": "refresh",
+      "to_node": {
+        "$component_ref": "fetch_lists"
       }
     },
     {
@@ -156,6 +207,54 @@
     }
   ],
   "data_flow_connections": [
+    {
+      "component_type": "DataFlowEdge",
+      "name": "start_to_fetch_lists_agent_run_id",
+      "source_node": {
+        "$component_ref": "start"
+      },
+      "source_output": "agent_run_id",
+      "destination_node": {
+        "$component_ref": "fetch_lists"
+      },
+      "destination_input": "agent_run_id"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "fetch_lists_to_emit_lists_lists",
+      "source_node": {
+        "$component_ref": "fetch_lists"
+      },
+      "source_output": "lists",
+      "destination_node": {
+        "$component_ref": "emit_lists"
+      },
+      "destination_input": "lists"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "fetch_lists_to_emit_lists_listsRead",
+      "source_node": {
+        "$component_ref": "fetch_lists"
+      },
+      "source_output": "listsRead",
+      "destination_node": {
+        "$component_ref": "emit_lists"
+      },
+      "destination_input": "listsRead"
+    },
+    {
+      "component_type": "DataFlowEdge",
+      "name": "scope_gate_to_scope_branch_accountScope",
+      "source_node": {
+        "$component_ref": "scope_gate"
+      },
+      "source_output": "accountScope",
+      "destination_node": {
+        "$component_ref": "scope_branch"
+      },
+      "destination_input": "accountScope"
+    },
     {
       "component_type": "DataFlowEdge",
       "name": "start_to_generate_agent_run_id",
@@ -314,6 +413,83 @@
     }
   ],
   "$referenced_components": {
+    "fetch_lists": {
+      "component_type": "ApiNode",
+      "id": "fetch_lists",
+      "name": "Read the CRM lists",
+      "url": "{{CINATRA_BASE_URL}}/api/llm-bridge",
+      "http_method": "POST",
+      "data": {
+        "system": "You are the CRM list fetch step of a campaign recipient selection. Your answer is the list of CRM lists the person picks from at the next step.\n\nStep 1: Call crm_list_search({ query: \"\", objectType: \"contact\" }) exactly once. Call no other tool. Its answer is an array of lists; each list carries an id and a name.\n\nStep 2: Return ONLY this JSON: {\"lists\":[{\"id\":\"<id>\",\"name\":\"<name>\"}],\"listsRead\":\"ok\"}. \"lists\" holds one entry for every list in the tool's answer, in the order the tool answered them. Do not filter, sort, merge, rename or add an entry. Copy each id and each name exactly as the tool answered it. When the tool answers an empty array, return {\"lists\":[],\"listsRead\":\"ok\"}.\n\nStep 3: When the tool call fails, or its answer is not an array, return {\"lists\":[],\"listsRead\":\"failed\"}. Do not describe the error and do not guess any list.",
+        "user": "Read the CRM lists now and return the result as JSON.\nInputs:\n- agent_run_id: {{ agent_run_id }}",
+        "agent_id": "email-recipient-selection",
+        "agent_run_id": "{{ agent_run_id }}",
+        "cinatra_llm": {
+          "preferredProvider": "openai",
+          "preferredModel": "gpt-5.5"
+        }
+      },
+      "outputs": [
+        {
+          "title": "lists",
+          "type": "array",
+          "description": "One entry for every list crm_list_search answered, in its order.",
+          "json_schema": {
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        {
+          "title": "listsRead",
+          "type": "string",
+          "description": "\"ok\" when crm_list_search answered an array, \"failed\" when it did not."
+        }
+      ],
+      "metadata": {
+        "cinatra": {
+          "riskClass": "read_only",
+          "requiresApproval": false,
+          "tools": [
+            "crm_list_search"
+          ]
+        }
+      }
+    },
+    "emit_lists": {
+      "component_type": "OutputMessageNode",
+      "id": "emit_lists",
+      "name": "Hand the lists to the picker",
+      "inputs": [
+        {
+          "title": "lists",
+          "type": "array",
+          "json_schema": {
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        {
+          "title": "listsRead",
+          "type": "string"
+        }
+      ],
+      "message": "{# pyagentspec-input-hint (do not remove): {{ lists }} {{ listsRead }} #}{\"lists\":{{ lists | tojson }},\"listsRead\":{{ listsRead | tojson }}}",
+      "metadata": {
+        "cinatra": {
+          "purpose": "list-picker-gate-content"
+        }
+      }
+    },
     "scope_gate": {
       "component_type": "InputMessageNode",
       "id": "scope_gate",
@@ -336,6 +512,30 @@
           "type": "string"
         }
       ]
+    },
+    "scope_branch": {
+      "component_type": "BranchingNode",
+      "id": "scope_branch",
+      "name": "Read the lists again or go on",
+      "metadata": {
+        "cinatra": {
+          "purpose": "re-read-the-crm-lists-on-the-declared-refresh-value"
+        }
+      },
+      "inputs": [
+        {
+          "title": "accountScope",
+          "type": "string"
+        }
+      ],
+      "outputs": [],
+      "branches": [
+        "default",
+        "refresh"
+      ],
+      "mapping": {
+        "refresh": "refresh"
+      }
     },
     "start": {
       "component_type": "StartNode",

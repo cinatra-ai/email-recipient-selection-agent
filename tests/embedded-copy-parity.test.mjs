@@ -13,7 +13,10 @@
 // flow, and each carries every key and every titled entry the copy's step
 // carries, with equal scalar values. Extra keys and extra entries are allowed:
 // this flow keeps its own apply step, its closing sentence and its end, which
-// hands on the reviewed count.
+// hands on the reviewed count. It also reads the CRM's lists before its
+// account-scope gate and branches on the gate's answer, so three control edges
+// of the copy are replaced by named roads (REPLACED_CONTROL_EDGES below) until
+// the outreach pack re-embeds this flow.
 //
 // The generate step's prompt texts are compared like every other value, with
 // one named exemption: this flow keeps its recipient limit, one paragraph of
@@ -170,14 +173,34 @@ test("(7) every data edge of the copy is a data edge of this flow, but the revie
   assert.deepEqual(missing, [], "this flow lacks the copy's data edges: " + missing.join("; "));
 });
 
-test("(7) every control edge of the copy is one of this flow, but the review's own road on", () => {
-  const have = controlEdgesOf(oas);
+/**
+ * The copy's control edges this flow replaces by a road of its own, each with
+ * the edges of that road. The replaced edge must not be in this flow.
+ */
+const REPLACED_CONTROL_EDGES = {
   // The copy's review goes straight to its end; this flow's review goes on to
   // its own apply step, closing sentence and end.
+  "approval_gate -> end": ["approval_gate -> apply"],
+  // This flow reads the CRM's lists before the account-scope gate and hands
+  // them to the gate as its content (cinatra-ai/cinatra#3562).
+  "start -> scope_gate": ["start -> fetch_lists", "fetch_lists -> emit_lists", "emit_lists -> scope_gate"],
+  // The gate's answer goes through a branch: the declared refresh value reads
+  // the lists again, every other answer goes on to the recipient fetch.
+  "scope_gate -> generate": [
+    "scope_gate -> scope_branch",
+    "scope_branch[default] -> generate",
+    "scope_branch[refresh] -> fetch_lists",
+  ],
+};
+
+test("(7) every control edge of the copy is one of this flow, but the roads this flow replaces", () => {
+  const have = controlEdgesOf(oas);
   const missing = [...controlEdgesOf(copy)]
-    .filter((edge) => edge !== "approval_gate -> end")
+    .filter((edge) => !Object.hasOwn(REPLACED_CONTROL_EDGES, edge))
     .filter((edge) => !have.has(edge));
-  if (!have.has("approval_gate -> apply")) missing.push("approval_gate -> apply");
-  if (have.has("approval_gate -> end")) missing.push("approval_gate -> end must not be here");
+  for (const [replaced, road] of Object.entries(REPLACED_CONTROL_EDGES)) {
+    for (const edge of road) if (!have.has(edge)) missing.push(edge);
+    if (have.has(replaced)) missing.push(`${replaced} must not be here`);
+  }
   assert.deepEqual(missing, [], "this flow lacks the copy's control edges: " + missing.join("; "));
 });
