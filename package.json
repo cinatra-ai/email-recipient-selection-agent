@@ -30,7 +30,8 @@
           "selection": "multiple",
           "minSelected": 1,
           "question": "Which views or lists in your CRM should this run take its recipients from?",
-          "emptyState": "There are no views or lists to pick from yet. Create one in your CRM, then open this step again."
+          "emptyState": "There are no views or lists in Twenty CRM to pick from yet. Create one in Twenty CRM.",
+          "refreshValue": "refresh"
         }
       }
     ],
