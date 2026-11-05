@@ -4,7 +4,7 @@ Resolves one or more saved CRM contacts lists into the confirmed recipient pool 
 
 **Install:** add the agent from the marketplace within an email outreach workflow. Set the `maxRecipients` cap in the agent install settings panel. No API keys are required beyond your existing CRM connection.
 
-**Usage:** the agent is triggered by an email campaign run. It first reads the lists you can pick from in Twenty CRM (`crm_list_search` for contact lists) and shows them, in the order the CRM answers them, in an interactive picker. If Twenty CRM has no list yet, the step asks you to create one there. After you pick, the agent runs autonomously: fetches each list's metadata, joins the members so a contact on several lists is counted once, expands each contact, saves the recipient list, then holds the run at its own "Review recipients" step, where you confirm or remove recipients before the selection is finalized. If the ticked lists together hold more contacts than `maxRecipients`, the agent blocks and reports an error rather than silently truncating. A cooldown filter (keeping out recently-contacted recipients) is applied at that review step; you can toggle it to include them.
+**Usage:** the agent is triggered by an email campaign run. It first reads the lists you can pick from in Twenty CRM (`crm_list_search` for contact lists) and hands them to an interactive picker. For an empty CRM, the picker's declared message asks you to create a list there. After you pick, the agent runs autonomously: fetches each list's metadata, joins the members so a contact on several lists is counted once, expands each contact, saves the recipient list, then holds the run at its own "Review recipients" step, where you confirm or remove recipients before the selection is finalized. If the ticked lists together hold more contacts than `maxRecipients`, the agent blocks and reports an error rather than silently truncating. A cooldown filter (keeping out recently-contacted recipients) is applied at that review step; you can toggle it to include them.
 
 **Troubleshooting:** if you see `unsupported_account_scope`, select one or more saved CRM lists (not "all contacts"). If a list returns zero members, the list may be empty or stale. If the run blocks with a cap error, tick fewer or smaller lists or raise `maxRecipients` in settings.
 
@@ -14,7 +14,7 @@ Resolves one or more saved CRM contacts lists into the confirmed recipient pool 
 
 ## Capabilities
 
-- List every contact list in Twenty CRM for you to pick from
+- Read the contact lists of Twenty CRM for you to pick from
 - Resolve one or more saved CRM lists into a confirmed recipient pool, re-fetching live data at run time
 - Enforce a configurable maximum-recipients cap on the ticked lists' total and block the run if it is exceeded
 - Expand each contact to include name, title, email, and parent account name

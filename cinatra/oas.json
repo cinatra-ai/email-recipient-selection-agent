@@ -420,7 +420,7 @@
       "url": "{{CINATRA_BASE_URL}}/api/llm-bridge",
       "http_method": "POST",
       "data": {
-        "system": "You are the CRM list fetch step of a campaign recipient selection. Your answer is the list of CRM lists the person picks from at the next step.\n\nStep 1: Call crm_list_search({ query: \"\", objectType: \"contact\" }) exactly once. Call no other tool. Its answer is an array of lists; each list carries an id and a name.\n\nStep 2: Return ONLY this JSON: {\"lists\":[{\"id\":\"<id>\",\"name\":\"<name>\"}],\"listsRead\":\"ok\"}. \"lists\" holds one entry for every list in the tool's answer, in the order the tool answered them. Do not filter, sort, merge, rename or add an entry. Copy each id and each name exactly as the tool answered it. When the tool answers an empty array, return {\"lists\":[],\"listsRead\":\"ok\"}.\n\nStep 3: When the tool call fails, or its answer is not an array, return {\"lists\":[],\"listsRead\":\"failed\"}. Do not describe the error and do not guess any list.",
+        "system": "You are the CRM list fetch step of a campaign recipient selection. Your answer is the list of CRM lists the person picks from at the next step.\n\nStep 1: Call crm_list_search({ query: \"\", objectType: \"contact\" }) exactly once. Call no other tool. Its answer is an array of lists; each list carries an id and a name.\n\nStep 2: Return ONLY this JSON: {\"lists\":[{\"id\":\"<id>\",\"name\":\"<name>\"}],\"listsRead\":\"ok\"}. \"lists\" holds one entry for every list in the tool's answer, in the order the tool answered them. Leave out an entry that has no text id or no text name; it cannot be picked. Apart from that, do not filter, sort, merge, rename or add an entry. Two lists with the same name stay two entries. Copy each id and each name exactly as the tool answered it. When the tool answers an empty array, return {\"lists\":[],\"listsRead\":\"ok\"}.\n\nStep 3: When the tool call fails, or its answer is not an array, return {\"lists\":[],\"listsRead\":\"failed\"}. Do not describe the error and do not guess any list.",
         "user": "Read the CRM lists now and return the result as JSON.\nInputs:\n- agent_run_id: {{ agent_run_id }}",
         "agent_id": "email-recipient-selection",
         "agent_run_id": "{{ agent_run_id }}",
@@ -433,7 +433,7 @@
         {
           "title": "lists",
           "type": "array",
-          "description": "One entry for every list crm_list_search answered, in its order.",
+          "description": "One entry for every list crm_list_search answered with an id and a name, in its order.",
           "json_schema": {
             "items": {
               "type": "object",
@@ -444,14 +444,25 @@
                 "name": {
                   "type": "string"
                 }
-              }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
             }
           }
         },
         {
           "title": "listsRead",
           "type": "string",
-          "description": "\"ok\" when crm_list_search answered an array, \"failed\" when it did not."
+          "description": "\"ok\" when crm_list_search answered an array, \"failed\" when it did not.",
+          "json_schema": {
+            "enum": [
+              "ok",
+              "failed"
+            ]
+          }
         }
       ],
       "metadata": {
