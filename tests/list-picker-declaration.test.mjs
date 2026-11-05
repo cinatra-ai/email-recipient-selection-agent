@@ -10,8 +10,11 @@
 // message a person reads when there is nothing to pick, and the value the step
 // answers to have the CRM's lists read again. The message names Twenty CRM, as
 // the owner's ruling on cinatra-ai/cinatra#3562 words it. This flow changes the
-// string first; the outreach package takes the same string when it re-embeds
-// this flow, and the two are pinned together. The retired list-builder
+// string first. Until the outreach package re-embeds this flow (a later unit of
+// the same issue), its own declaration still carries the earlier empty-state
+// words and no refresh value, so the two strings differ: the application must
+// not pin this package past this change before it pins the outreach package's
+// matching change, and the two pins move together. The retired list-builder
 // parameter is no longer part of it. kind, priority and the flag set stay
 // exactly as they were.
 
@@ -31,7 +34,7 @@ test("the list-picker binding is declared exactly once", () => {
   assert.equal(renderers.filter((r) => r.id === LIST_PICKER_ID).length, 1);
 });
 
-test("it names the selection contract in params, as the outreach package does", () => {
+test("it names the selection contract in params", () => {
   assert.deepEqual(entry.params, {
     selection: "multiple",
     minSelected: 1,
@@ -41,7 +44,7 @@ test("it names the selection contract in params, as the outreach package does", 
   });
 });
 
-test("params, the comparable string and the retired key follow the outreach package", () => {
+test("params, the comparable string and the retired key are the ones the outreach package takes at its re-embed", () => {
   assert.deepEqual(entry.params, {
     selection: "multiple",
     minSelected: 1,

@@ -3,21 +3,22 @@
 // (cinatra-ai/cinatra#3562 items 1 and 4).
 //
 // The application draws the gate; this flow supplies what the gate shows. A
-// fetch step calls the CRM connector's `crm_list_search` tool on the run's own
-// model-bridge road and returns one `{ id, name }` row for every list the tool
-// answers, in the tool's order. An output step then writes those rows as one
-// flat JSON object, so the message directly before the gate is that object and
-// the application hands its keys to the gate's renderer as they are.
+// fetch step is told to call the CRM connector's `crm_list_search` tool on the
+// run's own model-bridge road and to return one `{ id, name }` row for every
+// list the tool answers, in the tool's order. An output step then writes those
+// rows as one flat JSON object, so the message directly before the gate is that
+// object and the application hands its keys to the gate's renderer as they are.
 //
 // The gate's answer goes through a branch. The declared refresh value (the
-// binding's `params.refreshValue`) leads back to the fetch step, so a person
-// who has just created a list in the CRM sees it after one more read. Every
-// other answer goes on to the recipient fetch.
+// binding's `params.refreshValue`) leads back to the fetch step, so the lists
+// are read again. Every other answer goes on to the recipient fetch, whose own
+// prompt refuses a scope that is not a list scope with list ids.
 //
 // The fetch step itself is a model step, so this suite cannot run it. It pins
 // what is deterministic: the step's declaration and wiring, the shape it is
-// asked for, and what the gate is shown for a given fetch answer, including an
-// empty one.
+// asked for, the prompt's rules by their text, and what the gate is shown for a
+// given fetch answer, including an empty one. What the model does with a tool
+// answer is the prompt's promise, not a result of this suite.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -138,7 +139,7 @@ test("a fetch step and an output step run before the account-scope gate", () => 
   assert.equal(refs[EMIT]?.component_type, "OutputMessageNode");
 });
 
-test("the fetch step calls crm_list_search on the run's model-bridge road, and nothing else", () => {
+test("the fetch step is told to call crm_list_search only, on the run's model-bridge road", () => {
   const step = refs[FETCH];
   assert.ok(step, "the flow has no fetch step");
   assert.equal(step.component_type, "ApiNode");
@@ -179,11 +180,49 @@ test("the fetch step declares the { id, name } rows it is asked for", () => {
   assert.equal(outputs[1].type, "string");
 });
 
+test("a row must carry an id and a name and no other member", () => {
+  const items = (refs[FETCH]?.outputs ?? []).find((o) => o.title === "lists")?.json_schema?.items ?? {};
+  assert.deepEqual(items.required, ["id", "name"], "a row without an id or a name is not refused by the declaration");
+  assert.equal(items.additionalProperties, false, "a row may carry members the picker is not given (slug, objectType)");
+});
+
+test("listsRead is declared as one of ok and failed", () => {
+  const listsRead = (refs[FETCH]?.outputs ?? []).find((o) => o.title === "listsRead");
+  assert.deepEqual(listsRead?.json_schema?.enum, ["ok", "failed"]);
+});
+
+test("the fetch prompt states each rule for the tool's answer in full", () => {
+  const system = String(refs[FETCH]?.data?.system ?? "");
+  // An error or a non-array answer is a failed read, and only that.
+  assert.ok(
+    system.includes(
+      'Step 3: When the tool call fails, or its answer is not an array, return {"lists":[],"listsRead":"failed"}. Do not describe the error and do not guess any list.',
+    ),
+    "the failure rule of Step 3 changed",
+  );
+  // An empty array is an empty CRM, not a failed read.
+  assert.ok(system.includes('When the tool answers an empty array, return {"lists":[],"listsRead":"ok"}.'));
+  // A row that cannot be picked is left out; nothing else is.
+  assert.ok(
+    system.includes("Leave out an entry that has no text id or no text name; it cannot be picked."),
+    "the prompt has no rule for an entry without an id or a name",
+  );
+  assert.ok(
+    system.includes("Apart from that, do not filter, sort, merge, rename or add an entry."),
+    "the no-filter rule is not stated after the one exception",
+  );
+  // Two lists with one name are two lists.
+  assert.ok(
+    system.includes("Two lists with the same name stay two entries."),
+    "the prompt does not keep two lists that share a name",
+  );
+});
+
 // ---------------------------------------------------------------------------
 // The gate's content
 // ---------------------------------------------------------------------------
 
-test("the gate content lists every list of the tool answer, in order", () => {
+test("the gate content carries every row of the fetch answer, in its order", () => {
   const text = gateContentText(fetchAnswerFor(TOOL_ANSWER));
   // The application hands the keys of the message before a gate to its
   // renderer only when the whole trimmed text is one plain JSON object.
@@ -207,9 +246,20 @@ test("an empty tool answer gives an empty list as the gate content", () => {
   assert.equal(content.listsRead, "ok");
 });
 
-test("a failed read is told apart from an empty CRM", () => {
+test("a failed read reaches the gate content as listsRead \"failed\"", () => {
+  // The two cases differ in this value only; the lists are [] in both. Which
+  // words a person reads for each is the renderer's (a later unit).
   const content = JSON.parse(gateContentText(fetchAnswerFor([], "failed")));
   assert.deepEqual(content, { lists: [], listsRead: "failed" });
+});
+
+test("two lists with one name stay two rows in the gate content", () => {
+  const answer = [
+    { id: "view-7", name: "Founders" },
+    { id: "view-8", name: "Founders" },
+  ];
+  const content = JSON.parse(gateContentText(fetchAnswerFor(answer)));
+  assert.deepEqual(content.lists, answer);
 });
 
 test("the output step's message reads only what the fetch step hands it", () => {
@@ -257,4 +307,42 @@ test("a picked scope goes on to the recipient fetch, and a refresh never does", 
     "the gate still leads straight to the recipient fetch, so a refresh value would reach it",
   );
   assert.deepEqual(Object.values(refs[BRANCH]?.mapping ?? {}).length, 1, "the branch maps more than the refresh value");
+});
+
+test("every answer but the exact refresh value goes on to the recipient fetch", () => {
+  // Near misses of the refresh value, an empty answer, and scopes the
+  // recipient fetch refuses: none of them reads the lists again.
+  const unknown = [
+    "Refresh",
+    "REFRESH",
+    " refresh",
+    "refresh\n",
+    "",
+    "null",
+    "[]",
+    JSON.stringify({ listIds: ["view-1"], listNames: ["All People"] }),
+    JSON.stringify({ type: "all-contacts" }),
+  ];
+  for (const answer of unknown) {
+    assert.equal(stepAfterGate(answer), "generate", `the answer ${JSON.stringify(answer)} does not go to the recipient fetch`);
+  }
+  assert.deepEqual(Object.keys(refs[BRANCH]?.mapping ?? {}), ["refresh"]);
+});
+
+test("the recipient fetch refuses a scope that is not a list scope with list ids", () => {
+  // The refusal is the recipient fetch's own prompt rule (a model step): an
+  // answer that is not a type "list" scope, or a list scope without list ids,
+  // gets the unsupported_account_scope error and no recipient.
+  const system = String(refs.generate?.data?.system ?? "");
+  assert.ok(system.includes("Step 1: Parse accountScope as JSON. ONLY type='list' is supported."));
+  assert.ok(
+    system.includes(
+      'If type is anything else, return an error JSON: {"error":"unsupported_account_scope","scopeType":"<the input type>"',
+    ),
+  );
+  assert.ok(
+    system.includes(
+      "If it carries neither shape, or selectedListIds is empty, return the same unsupported_account_scope error JSON with scopeType 'list'.",
+    ),
+  );
 });
