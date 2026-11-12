@@ -11,8 +11,10 @@
 //
 // The gate's answer goes through a branch. The declared refresh value (the
 // binding's `params.refreshValue`) leads back to the fetch step, so the lists
-// are read again. Every other answer goes on to the recipient fetch, whose own
-// prompt refuses a scope that is not a list scope with list ids.
+// are read again. Every other string answer goes on to the recipient fetch,
+// whose own prompt refuses an answer that is not a JSON object, and a scope
+// that is not a list scope with list ids. How the runtime branches on an
+// answer that is not a string is not read in this repository.
 //
 // The fetch step itself is a model step, so this suite cannot run it. It pins
 // what is deterministic: the step's declaration and wiring, the shape it is
@@ -40,6 +42,24 @@ const EMIT = "emit_lists";
 const GATE = "scope_gate";
 const BRANCH = "scope_branch";
 const SEARCH_CALL = 'crm_list_search({ query: "", objectType: "contact" })';
+
+// The fetch step's whole prompt, word for word. A rule added anywhere in it (a
+// second call, another tool) or a rule taken out fails the exact-text test.
+const FETCH_SYSTEM = [
+  "You are the CRM list fetch step of a campaign recipient selection. Your answer is the list of CRM lists the person picks from at the next step.",
+  'Step 1: Call crm_list_search({ query: "", objectType: "contact" }) exactly once. Call no other tool. Its answer is an array of lists; each list carries an id and a name.',
+  'Step 2: Return ONLY this JSON: {"lists":[{"id":"<id>","name":"<name>"}],"listsRead":"ok"}. "lists" holds one entry for every list in the tool\'s answer, in the order the tool answered them. Leave out an entry that has no text id or no text name; it cannot be picked. Apart from that, do not filter, sort, merge, rename or add an entry. Two lists with the same name stay two entries. Copy each id and each name exactly as the tool answered it. When the tool answers an empty array, return {"lists":[],"listsRead":"ok"}.',
+  'Step 3: When the tool call fails, or its answer is not an array, return {"lists":[],"listsRead":"failed"}. Do not describe the error and do not guess any list.',
+].join("\n\n");
+const FETCH_USER = "Read the CRM lists now and return the result as JSON.\nInputs:\n- agent_run_id: {{ agent_run_id }}";
+
+// The recipient fetch's rule for an answer that is not a JSON object (a near
+// miss of the refresh value, an empty answer, null, an array). It stands
+// directly after the first sentence of the recipient fetch's Step 1.
+const UNPARSED_SCOPE_RULE =
+  "If accountScope does not parse as JSON, or parses to anything but a JSON object (for example an empty answer, " +
+  'a bare word such as Refresh, null or an array), return {"error":"unsupported_account_scope","scopeType":"unparsed",' +
+  '"summary":"Only list-sourced recipient selection is supported; pick a saved CRM list."} and call no tool. ';
 
 const controlEdges = (oas.control_flow_connections ?? []).map((e) => ({
   from: e.from_node.$component_ref,
@@ -152,7 +172,8 @@ test("the fetch step is told to call crm_list_search only, on the run's model-br
   assert.deepEqual(step.metadata?.cinatra?.tools, ["crm_list_search"]);
   const system = String(step.data?.system ?? "");
   assert.equal(system.split(SEARCH_CALL).length, 2, `the prompt does not name ${SEARCH_CALL} exactly once`);
-  const toolNames = new Set(system.match(/\b(?:crm|objects|lists|contacts|accounts)_[a-z_]+\b/g) ?? []);
+  // Every snake_case word, so a tool of any name (web_search) is caught.
+  const toolNames = new Set(system.match(/\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/g) ?? []);
   assert.deepEqual([...toolNames], ["crm_list_search"], "the prompt names another tool");
   assert.match(system, /every list/i);
   assert.match(system, /in the order the tool answered/i);
@@ -216,6 +237,15 @@ test("the fetch prompt states each rule for the tool's answer in full", () => {
     system.includes("Two lists with the same name stay two entries."),
     "the prompt does not keep two lists that share a name",
   );
+});
+
+test("the fetch prompt is exactly its three steps, and its user text names no tool", () => {
+  // The rules above, pinned whole: one call of crm_list_search and no other
+  // tool, each id and name copied exactly, the order, the one exception, the
+  // empty and the failed answer. Any added or removed sentence fails here.
+  const data = refs[FETCH]?.data ?? {};
+  assert.equal(data.system, FETCH_SYSTEM, "the fetch prompt is not exactly its three steps");
+  assert.equal(data.user, FETCH_USER, "the fetch step's user text changed");
 });
 
 // ---------------------------------------------------------------------------
@@ -311,7 +341,9 @@ test("a picked scope goes on to the recipient fetch, and a refresh never does", 
 
 test("every answer but the exact refresh value goes on to the recipient fetch", () => {
   // Near misses of the refresh value, an empty answer, and scopes the
-  // recipient fetch refuses: none of them reads the lists again.
+  // recipient fetch refuses: none of them reads the lists again. These are
+  // string answers; the branch's handling of an answer that is not a string
+  // is the runtime's and is not read here.
   const unknown = [
     "Refresh",
     "REFRESH",
@@ -334,7 +366,7 @@ test("the recipient fetch refuses a scope that is not a list scope with list ids
   // answer that is not a type "list" scope, or a list scope without list ids,
   // gets the unsupported_account_scope error and no recipient.
   const system = String(refs.generate?.data?.system ?? "");
-  assert.ok(system.includes("Step 1: Parse accountScope as JSON. ONLY type='list' is supported."));
+  assert.ok(system.includes("ONLY type='list' is supported."));
   assert.ok(
     system.includes(
       'If type is anything else, return an error JSON: {"error":"unsupported_account_scope","scopeType":"<the input type>"',
@@ -345,4 +377,17 @@ test("the recipient fetch refuses a scope that is not a list scope with list ids
       "If it carries neither shape, or selectedListIds is empty, return the same unsupported_account_scope error JSON with scopeType 'list'.",
     ),
   );
+});
+
+test("the recipient fetch refuses an answer that is not a JSON object", () => {
+  // A near miss of the refresh value ("Refresh"), an empty answer, "null" and
+  // "[]" go on to the recipient fetch (above). Its prompt states, before any
+  // other rule of Step 1, what it returns for them: the same
+  // unsupported_account_scope error, and no tool call.
+  const system = String(refs.generate?.data?.system ?? "");
+  assert.ok(
+    system.includes("Step 1: Parse accountScope as JSON. " + UNPARSED_SCOPE_RULE + "ONLY type='list' is supported."),
+    "the recipient fetch has no rule for an answer that is not a JSON object, directly after it parses the answer",
+  );
+  assert.equal(system.split(UNPARSED_SCOPE_RULE).length, 2, "the rule is not there exactly once");
 });

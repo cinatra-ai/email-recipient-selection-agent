@@ -19,10 +19,13 @@
 // the outreach pack re-embeds this flow.
 //
 // The generate step's prompt texts are compared like every other value, with
-// one named exemption: this flow keeps its recipient limit, one paragraph of
-// its system text (RECIPIENT_LIMIT below). That paragraph, with the paragraph
-// break after it, is taken out of this flow's system text by its exact text
-// before the comparison, so any other difference in the prompt still fails.
+// two named exemptions. This flow keeps its recipient limit, one paragraph of
+// its system text (RECIPIENT_LIMIT below), and its rule for an answer that is
+// not a JSON object, one sentence directly after Step 1 parses the answer
+// (UNPARSED_SCOPE_RULE below; the gate's answer goes through a branch here,
+// so a near miss of the refresh value reaches the recipient fetch). Each is
+// taken out of this flow's system text by its exact text before the
+// comparison, so any other difference in the prompt still fails.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -68,8 +71,17 @@ const RECIPIENT_LIMIT =
 /** The paragraph of the copy's prompt that the recipient limit stands before. */
 const LIMIT_BEFORE = "Step 5 — CRITICAL:";
 
-/** This flow's generate step with the recipient limit taken out, or a reason. */
-function generateWithoutLimit(step, missing) {
+/** This flow's rule for an answer that is not a JSON object: one sentence. */
+const UNPARSED_SCOPE_RULE =
+  "If accountScope does not parse as JSON, or parses to anything but a JSON object (for example an empty answer, " +
+  'a bare word such as Refresh, null or an array), return {"error":"unsupported_account_scope","scopeType":"unparsed",' +
+  '"summary":"Only list-sourced recipient selection is supported; pick a saved CRM list."} and call no tool. ';
+
+/** The sentence of the copy's prompt that the unparsed-scope rule stands after. */
+const UNPARSED_AFTER = "Step 1: Parse accountScope as JSON. ";
+
+/** This flow's generate step with its two own rules taken out, or a reason. */
+function generateWithoutOwnRules(step, missing) {
   const system = step?.data?.system;
   const parts = typeof system === "string" ? system.split(RECIPIENT_LIMIT) : [];
   if (parts.length !== 2) {
@@ -81,7 +93,16 @@ function generateWithoutLimit(step, missing) {
     missing.push(`the recipient limit sentences do not stand directly before ${LIMIT_BEFORE}`);
     return step;
   }
-  return { ...step, data: { ...step.data, system: parts.join("") } };
+  const rest = parts.join("").split(UNPARSED_SCOPE_RULE);
+  if (rest.length !== 2) {
+    missing.push("the unparsed-scope rule is not there exactly once");
+    return step;
+  }
+  if (!rest[0].endsWith(UNPARSED_AFTER)) {
+    missing.push(`the unparsed-scope rule does not stand directly after ${JSON.stringify(UNPARSED_AFTER)}`);
+    return step;
+  }
+  return { ...step, data: { ...step.data, system: rest.join("") } };
 }
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -147,7 +168,7 @@ test("(7) every step of the embedded copy is a step of this flow, carrying all i
       missing.push(`${id}: not defined in this flow`);
       continue;
     }
-    const step = id === "generate" ? generateWithoutLimit(refs[id], missing) : refs[id];
+    const step = id === "generate" ? generateWithoutOwnRules(refs[id], missing) : refs[id];
     contains(step, copyRefs[id], id, missing);
   }
   assert.deepEqual(missing, [], "this flow lacks what the embedded copy carries: " + missing.join("; "));
