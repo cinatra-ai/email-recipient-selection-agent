@@ -19,13 +19,16 @@
 // the outreach pack re-embeds this flow.
 //
 // The generate step's prompt texts are compared like every other value, with
-// two named exemptions. This flow keeps its recipient limit, one paragraph of
+// three named exemptions. This flow keeps its recipient limit, one paragraph of
 // its system text (RECIPIENT_LIMIT below), and its rule for an answer that is
 // not a JSON object, one sentence directly after Step 1 parses the answer
 // (UNPARSED_SCOPE_RULE below; the gate's answer goes through a branch here,
 // so a near miss of the refresh value reaches the recipient fetch). Each is
 // taken out of this flow's system text by its exact text before the
-// comparison, so any other difference in the prompt still fails.
+// comparison. Its two save rules name an exception for the error JSONs of
+// Step 1 and of the recipient limit (SAVE_RULES below); each is put back to
+// the copy's exact sentence before the comparison. Any other difference in the
+// prompt still fails.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -80,7 +83,24 @@ const UNPARSED_SCOPE_RULE =
 /** The sentence of the copy's prompt that the unparsed-scope rule stands after. */
 const UNPARSED_AFTER = "Step 1: Parse accountScope as JSON. ";
 
-/** This flow's generate step with its two own rules taken out, or a reason. */
+/**
+ * This flow's two save rules, each with the copy's sentence it replaces. They
+ * name the exception for the error JSONs of Step 1 and of the recipient limit,
+ * so the refusals of Step 1 are not contradicted by a save rule.
+ */
+const SAVE_EXCEPTION = ", except an error JSON of Step 1 or of the recipient limit";
+const SAVE_RULES = [
+  [
+    "Step 5 — CRITICAL: Call objects_save BEFORE returning any JSON" + SAVE_EXCEPTION + ".",
+    "Step 5 — CRITICAL: Call objects_save BEFORE returning any JSON.",
+  ],
+  [
+    "Do NOT return JSON before completing Step 5" + SAVE_EXCEPTION + ": such an error is returned at once, without objects_save.",
+    "Do NOT return JSON before completing Step 5.",
+  ],
+];
+
+/** This flow's generate step with its own rules taken out or put back, or a reason. */
 function generateWithoutOwnRules(step, missing) {
   const system = step?.data?.system;
   const parts = typeof system === "string" ? system.split(RECIPIENT_LIMIT) : [];
@@ -102,7 +122,16 @@ function generateWithoutOwnRules(step, missing) {
     missing.push(`the unparsed-scope rule does not stand directly after ${JSON.stringify(UNPARSED_AFTER)}`);
     return step;
   }
-  return { ...step, data: { ...step.data, system: rest.join("") } };
+  let system = rest.join("");
+  for (const [own, copied] of SAVE_RULES) {
+    const pieces = system.split(own);
+    if (pieces.length !== 2) {
+      missing.push(`the save rule ${JSON.stringify(own)} is not there exactly once`);
+      return step;
+    }
+    system = pieces.join(copied);
+  }
+  return { ...step, data: { ...step.data, system } };
 }
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);

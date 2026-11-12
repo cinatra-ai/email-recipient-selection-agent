@@ -53,6 +53,16 @@ const FETCH_SYSTEM = [
 ].join("\n\n");
 const FETCH_USER = "Read the CRM lists now and return the result as JSON.\nInputs:\n- agent_run_id: {{ agent_run_id }}";
 
+// The recipient fetch's save rule. Step 5 saves the recipients with
+// objects_save before the step returns its JSON; an error JSON of Step 1 or of
+// the recipient limit is the exception and is returned at once, without
+// objects_save. Each of the two sentences names that exception, so the refusals
+// of Step 1 ("call no tool") are not contradicted by a later rule.
+const SAVE_EXCEPTION = ", except an error JSON of Step 1 or of the recipient limit";
+const SAVE_RULE = "Step 5 — CRITICAL: Call objects_save BEFORE returning any JSON" + SAVE_EXCEPTION + ".";
+const SAVE_CLOSE =
+  "Do NOT return JSON before completing Step 5" + SAVE_EXCEPTION + ": such an error is returned at once, without objects_save.";
+
 // The recipient fetch's rule for an answer that is not a JSON object (a near
 // miss of the refresh value, an empty answer, null, an array). It stands
 // directly after the first sentence of the recipient fetch's Step 1.
@@ -339,7 +349,7 @@ test("a picked scope goes on to the recipient fetch, and a refresh never does", 
   assert.deepEqual(Object.values(refs[BRANCH]?.mapping ?? {}).length, 1, "the branch maps more than the refresh value");
 });
 
-test("every answer but the exact refresh value goes on to the recipient fetch", () => {
+test("every string answer but the exact refresh value goes on to the recipient fetch", () => {
   // Near misses of the refresh value, an empty answer, and scopes the
   // recipient fetch refuses: none of them reads the lists again. These are
   // string answers; the branch's handling of an answer that is not a string
@@ -390,4 +400,28 @@ test("the recipient fetch refuses an answer that is not a JSON object", () => {
     "the recipient fetch has no rule for an answer that is not a JSON object, directly after it parses the answer",
   );
   assert.equal(system.split(UNPARSED_SCOPE_RULE).length, 2, "the rule is not there exactly once");
+});
+
+test("no rule of the recipient fetch asks for a save before a refusal of Step 1", () => {
+  // Step 1 returns its refusals before any tool call; the unparsed-scope rule
+  // says "call no tool". A later rule that asks for objects_save before ANY
+  // JSON contradicts that. Every sentence that makes a save the condition of
+  // returning JSON must name the exception for the errors of Step 1 and of the
+  // recipient limit.
+  const system = String(refs.generate?.data?.system ?? "");
+  assert.ok(system.includes("\n\n" + SAVE_RULE + " "), "Step 5 does not name the exception for the error JSONs");
+  assert.ok(system.endsWith(" " + SAVE_CLOSE), "the closing rule does not name the exception for the error JSONs");
+  const conditions = [...system.matchAll(/BEFORE returning any JSON|before completing Step 5/gi)];
+  assert.ok(conditions.length >= 2, "the save rules are not there");
+  for (const found of conditions) {
+    const after = system.slice(found.index + found[0].length);
+    assert.ok(
+      after.startsWith(SAVE_EXCEPTION),
+      `the rule ${JSON.stringify(found[0])} does not name the exception for the error JSONs of Step 1 and the recipient limit`,
+    );
+  }
+  assert.ok(
+    system.includes('"summary":"Only list-sourced recipient selection is supported; pick a saved CRM list."} and call no tool. '),
+    "the unparsed-scope rule no longer says that it calls no tool",
+  );
 });
