@@ -122,16 +122,16 @@ function generateWithoutOwnRules(step, missing) {
     missing.push(`the unparsed-scope rule does not stand directly after ${JSON.stringify(UNPARSED_AFTER)}`);
     return step;
   }
-  let system = rest.join("");
+  let compared = rest.join("");
   for (const [own, copied] of SAVE_RULES) {
-    const pieces = system.split(own);
+    const pieces = compared.split(own);
     if (pieces.length !== 2) {
       missing.push(`the save rule ${JSON.stringify(own)} is not there exactly once`);
       return step;
     }
-    system = pieces.join(copied);
+    compared = pieces.join(copied);
   }
-  return { ...step, data: { ...step.data, system } };
+  return { ...step, data: { ...step.data, system: compared } };
 }
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
