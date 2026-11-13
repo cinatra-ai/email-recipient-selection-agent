@@ -13,13 +13,22 @@
 // flow, and each carries every key and every titled entry the copy's step
 // carries, with equal scalar values. Extra keys and extra entries are allowed:
 // this flow keeps its own apply step, its closing sentence and its end, which
-// hands on the reviewed count.
+// hands on the reviewed count. It also reads the CRM's lists before its
+// account-scope gate and branches on the gate's answer, so three control edges
+// of the copy are replaced by named roads (REPLACED_CONTROL_EDGES below) until
+// the outreach pack re-embeds this flow.
 //
 // The generate step's prompt texts are compared like every other value, with
-// one named exemption: this flow keeps its recipient limit, one paragraph of
-// its system text (RECIPIENT_LIMIT below). That paragraph, with the paragraph
-// break after it, is taken out of this flow's system text by its exact text
-// before the comparison, so any other difference in the prompt still fails.
+// three named exemptions. This flow keeps its recipient limit, one paragraph of
+// its system text (RECIPIENT_LIMIT below), and its rule for an answer that is
+// not a JSON object, one sentence directly after Step 1 parses the answer
+// (UNPARSED_SCOPE_RULE below; the gate's answer goes through a branch here,
+// so a near miss of the refresh value reaches the recipient fetch). Each is
+// taken out of this flow's system text by its exact text before the
+// comparison. Its two save rules name an exception for the error JSONs of
+// Step 1 and of the recipient limit (SAVE_RULES below); each is put back to
+// the copy's exact sentence before the comparison. Any other difference in the
+// prompt still fails.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -65,8 +74,34 @@ const RECIPIENT_LIMIT =
 /** The paragraph of the copy's prompt that the recipient limit stands before. */
 const LIMIT_BEFORE = "Step 5 — CRITICAL:";
 
-/** This flow's generate step with the recipient limit taken out, or a reason. */
-function generateWithoutLimit(step, missing) {
+/** This flow's rule for an answer that is not a JSON object: one sentence. */
+const UNPARSED_SCOPE_RULE =
+  "If accountScope does not parse as JSON, or parses to anything but a JSON object (for example an empty answer, " +
+  'a bare word such as Refresh, null or an array), return {"error":"unsupported_account_scope","scopeType":"unparsed",' +
+  '"summary":"Only list-sourced recipient selection is supported; pick a saved CRM list."} and call no tool. ';
+
+/** The sentence of the copy's prompt that the unparsed-scope rule stands after. */
+const UNPARSED_AFTER = "Step 1: Parse accountScope as JSON. ";
+
+/**
+ * This flow's two save rules, each with the copy's sentence it replaces. They
+ * name the exception for the error JSONs of Step 1 and of the recipient limit,
+ * so the refusals of Step 1 are not contradicted by a save rule.
+ */
+const SAVE_EXCEPTION = ", except an error JSON of Step 1 or of the recipient limit";
+const SAVE_RULES = [
+  [
+    "Step 5 — CRITICAL: Call objects_save BEFORE returning any JSON" + SAVE_EXCEPTION + ".",
+    "Step 5 — CRITICAL: Call objects_save BEFORE returning any JSON.",
+  ],
+  [
+    "Do NOT return JSON before completing Step 5" + SAVE_EXCEPTION + ": such an error is returned at once, without objects_save.",
+    "Do NOT return JSON before completing Step 5.",
+  ],
+];
+
+/** This flow's generate step with its own rules taken out or put back, or a reason. */
+function generateWithoutOwnRules(step, missing) {
   const system = step?.data?.system;
   const parts = typeof system === "string" ? system.split(RECIPIENT_LIMIT) : [];
   if (parts.length !== 2) {
@@ -78,7 +113,25 @@ function generateWithoutLimit(step, missing) {
     missing.push(`the recipient limit sentences do not stand directly before ${LIMIT_BEFORE}`);
     return step;
   }
-  return { ...step, data: { ...step.data, system: parts.join("") } };
+  const rest = parts.join("").split(UNPARSED_SCOPE_RULE);
+  if (rest.length !== 2) {
+    missing.push("the unparsed-scope rule is not there exactly once");
+    return step;
+  }
+  if (!rest[0].endsWith(UNPARSED_AFTER)) {
+    missing.push(`the unparsed-scope rule does not stand directly after ${JSON.stringify(UNPARSED_AFTER)}`);
+    return step;
+  }
+  let compared = rest.join("");
+  for (const [own, copied] of SAVE_RULES) {
+    const pieces = compared.split(own);
+    if (pieces.length !== 2) {
+      missing.push(`the save rule ${JSON.stringify(own)} is not there exactly once`);
+      return step;
+    }
+    compared = pieces.join(copied);
+  }
+  return { ...step, data: { ...step.data, system: compared } };
 }
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -144,7 +197,7 @@ test("(7) every step of the embedded copy is a step of this flow, carrying all i
       missing.push(`${id}: not defined in this flow`);
       continue;
     }
-    const step = id === "generate" ? generateWithoutLimit(refs[id], missing) : refs[id];
+    const step = id === "generate" ? generateWithoutOwnRules(refs[id], missing) : refs[id];
     contains(step, copyRefs[id], id, missing);
   }
   assert.deepEqual(missing, [], "this flow lacks what the embedded copy carries: " + missing.join("; "));
@@ -170,14 +223,34 @@ test("(7) every data edge of the copy is a data edge of this flow, but the revie
   assert.deepEqual(missing, [], "this flow lacks the copy's data edges: " + missing.join("; "));
 });
 
-test("(7) every control edge of the copy is one of this flow, but the review's own road on", () => {
-  const have = controlEdgesOf(oas);
+/**
+ * The copy's control edges this flow replaces by a road of its own, each with
+ * the edges of that road. The replaced edge must not be in this flow.
+ */
+const REPLACED_CONTROL_EDGES = {
   // The copy's review goes straight to its end; this flow's review goes on to
   // its own apply step, closing sentence and end.
+  "approval_gate -> end": ["approval_gate -> apply"],
+  // This flow reads the CRM's lists before the account-scope gate and hands
+  // them to the gate as its content (cinatra-ai/cinatra#3562).
+  "start -> scope_gate": ["start -> fetch_lists", "fetch_lists -> emit_lists", "emit_lists -> scope_gate"],
+  // The gate's answer goes through a branch: the declared refresh value reads
+  // the lists again, every other answer goes on to the recipient fetch.
+  "scope_gate -> generate": [
+    "scope_gate -> scope_branch",
+    "scope_branch[default] -> generate",
+    "scope_branch[refresh] -> fetch_lists",
+  ],
+};
+
+test("(7) every control edge of the copy is one of this flow, but the roads this flow replaces", () => {
+  const have = controlEdgesOf(oas);
   const missing = [...controlEdgesOf(copy)]
-    .filter((edge) => edge !== "approval_gate -> end")
+    .filter((edge) => !Object.hasOwn(REPLACED_CONTROL_EDGES, edge))
     .filter((edge) => !have.has(edge));
-  if (!have.has("approval_gate -> apply")) missing.push("approval_gate -> apply");
-  if (have.has("approval_gate -> end")) missing.push("approval_gate -> end must not be here");
+  for (const [replaced, road] of Object.entries(REPLACED_CONTROL_EDGES)) {
+    for (const edge of road) if (!have.has(edge)) missing.push(edge);
+    if (have.has(replaced)) missing.push(`${replaced} must not be here`);
+  }
   assert.deepEqual(missing, [], "this flow lacks the copy's control edges: " + missing.join("; "));
 });
