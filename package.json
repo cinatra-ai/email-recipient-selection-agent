@@ -32,6 +32,10 @@
           "question": "Which views or lists in your CRM should this run take its recipients from?",
           "emptyState": "There are no views or lists in Twenty CRM to pick from yet. Create one in Twenty CRM.",
           "refreshValue": "refresh"
+        },
+        "component": {
+          "entry": "./src/renderers/list-picker.ts",
+          "propsApiVersion": 1
         }
       }
     ],
