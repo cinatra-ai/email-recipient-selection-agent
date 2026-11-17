@@ -5,12 +5,10 @@ name: truthful-attribution-gate
 # it never fails a PR. .github/gate-suite.json names this engine in its
 # truthful-attribution-gate entry (workflow + pinned): move that pin, the `uses:`
 # pin and the `ref:` input below together, in one commit.
-# Pinned to the immutable engine SHA 641255c8, ci `main` HEAD when the manifest
-# content rule landed, ahead of the latest release tag — so
-# the trailing version comment on the `uses:` line is an honest main-branch
-# prerelease marker derived from that SHA (a `0.0.0-main.<sha>` form, NOT a real
-# release tag — claiming one would be false metadata). It is only there to
-# satisfy the repo's actions-pinned-gate, which requires a version comment.
+# Pinned to the immutable engine SHA 7c767fe7 (grant revision 3), which
+# carries no tag. The actions pin gate requires a comment of the form
+# `# v<number>` on the uses: line, so that comment is a bare `v0` with the
+# engine's short sha as build metadata; it claims no tag.
 
 on:
   pull_request:
@@ -31,7 +29,7 @@ permissions:
 
 jobs:
   truthful-attribution-gate:                 # caller job id MUST stay this exact string
-    uses: cinatra-ai/ci/.github/workflows/truthful-attribution-gate.yml@641255c87fd063dd4c2d4d6ff1c785ba77bf2a5c # v0.0.0-main.641255c8
+    uses: cinatra-ai/ci/.github/workflows/truthful-attribution-gate.yml@7c767fe7fabc5e4fb93e2142987a2b2dff502014 # v0+engine.7c767fe7.grant.3
     with:
       mode: warn
-      ref: 641255c87fd063dd4c2d4d6ff1c785ba77bf2a5c
+      ref: 7c767fe7fabc5e4fb93e2142987a2b2dff502014
