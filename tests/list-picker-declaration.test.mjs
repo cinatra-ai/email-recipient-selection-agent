@@ -94,3 +94,69 @@ test("kind, priority and the flag set are unchanged; component is the only added
   assert.equal(Object.hasOwn(entry, "a2uiTranslator"), false);
   assert.deepEqual(Object.keys(entry).sort(), ["component", "id", "kind", "params", "priority"]);
 });
+
+// The version that carries this declaration. Version 0.1.4 was published by no
+// release and named three different declarations of this binding (without the
+// refresh value, then without the component, then the one above), so a range
+// in the outreach package could not tell them apart. 0.1.5 is the first version
+// whose every commit carries the declaration above (params and component, as at
+// commit ef807294), and the outreach package's dependency range starts there
+// (cinatra-ai/cinatra#3562). Any later version keeps it or changes this test.
+const FIRST_VERSION_WITH_THIS_DECLARATION = "0.1.5";
+
+// A strict SemVer 2.0.0 reading: major.minor.patch, each a number without a
+// leading zero, an optional prerelease (dot-separated identifiers; a numeric
+// one without a leading zero) and optional build metadata, which is ignored.
+// Anything else is null.
+const SEMVER =
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-((?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9]\d*|\d*[A-Za-z-][0-9A-Za-z-]*))*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+
+function parseSemver(version) {
+  const match = typeof version === "string" ? SEMVER.exec(version) : null;
+  if (match === null) return null;
+  return { core: match.slice(1, 4).map(Number), prerelease: match[4] === undefined ? null : match[4].split(".") };
+}
+
+/** Whether a version is at or above a floor that has no prerelease (SemVer precedence). */
+function atOrAbove(version, floor) {
+  const v = parseSemver(version);
+  const f = parseSemver(floor);
+  if (v === null || f === null || f.prerelease !== null) return false;
+  for (let i = 0; i < 3; i += 1) {
+    if (v.core[i] !== f.core[i]) return v.core[i] > f.core[i];
+  }
+  // Same core: a prerelease of the floor precedes the floor itself.
+  return v.prerelease === null;
+}
+
+test("the version floor reads versions as strict SemVer", () => {
+  const accepted = ["0.1.5", "0.1.6", "0.2.0", "1.0.0", "0.1.5+build.7", "0.1.5+build-rc", "0.1.6-rc.1", "10.0.0"];
+  const refused = [
+    "0.1.4",
+    "0.1",
+    "0.1.5-rc.1",
+    "0.1.5-0",
+    "00.1.5",
+    "0.01.5",
+    "0.1.05",
+    "v" + "0.1.5", // a leading v is no version
+    "0.1.5.0",
+    "0.1.x",
+    "0.1.5-",
+    "0.1.5-01",
+    "",
+    undefined,
+  ];
+  for (const version of accepted) assert.equal(atOrAbove(version, FIRST_VERSION_WITH_THIS_DECLARATION), true, `refused ${version}`);
+  for (const version of refused) {
+    assert.equal(atOrAbove(version, FIRST_VERSION_WITH_THIS_DECLARATION), false, `accepted ${version}`);
+  }
+});
+
+test("the package version is at least the first version that carries this declaration", () => {
+  assert.ok(parseSemver(pkg.version), `version ${pkg.version} is not strict SemVer`);
+  assert.ok(
+    atOrAbove(pkg.version, FIRST_VERSION_WITH_THIS_DECLARATION),
+    `version ${pkg.version} is below ${FIRST_VERSION_WITH_THIS_DECLARATION}`,
+  );
+});
