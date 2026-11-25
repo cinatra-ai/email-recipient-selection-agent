@@ -94,3 +94,22 @@ test("kind, priority and the flag set are unchanged; component is the only added
   assert.equal(Object.hasOwn(entry, "a2uiTranslator"), false);
   assert.deepEqual(Object.keys(entry).sort(), ["component", "id", "kind", "params", "priority"]);
 });
+
+// The version that carries this declaration. Version 0.1.4 was published by no
+// release and named three different declarations of this binding (without the
+// refresh value, then without the component, then the one above), so a range
+// in the outreach package could not tell them apart. 0.1.5 is the first version
+// whose every commit carries the declaration above (params and component, as at
+// commit ef807294), and the outreach package's dependency range starts there
+// (cinatra-ai/cinatra#3562). Any later version keeps it or changes this test.
+const FIRST_VERSION_WITH_THIS_DECLARATION = [0, 1, 5];
+
+test("the package version is at least the first version that carries this declaration", () => {
+  const parts = pkg.version.split(/[.+-]/).slice(0, 3).map(Number);
+  assert.ok(parts.every(Number.isInteger), `version ${pkg.version} is not major.minor.patch`);
+  const order = parts.findIndex((part, i) => part !== FIRST_VERSION_WITH_THIS_DECLARATION[i]);
+  assert.ok(
+    order === -1 || parts[order] > FIRST_VERSION_WITH_THIS_DECLARATION[order],
+    `version ${pkg.version} is below ${FIRST_VERSION_WITH_THIS_DECLARATION.join(".")}`,
+  );
+});
