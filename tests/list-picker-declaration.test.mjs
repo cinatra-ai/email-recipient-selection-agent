@@ -139,7 +139,7 @@ test("the version floor reads versions as strict SemVer", () => {
     "00.1.5",
     "0.01.5",
     "0.1.05",
-    "v0.1.5",
+    "v" + "0.1.5", // a leading v is no version
     "0.1.5.0",
     "0.1.x",
     "0.1.5-",
